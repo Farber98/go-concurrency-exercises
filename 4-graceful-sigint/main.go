@@ -13,10 +13,36 @@
 
 package main
 
+import (
+	"fmt"
+	"os"
+	"os/signal"
+	"syscall"
+)
+
+var sigintCallings int
+
 func main() {
 	// Create a process
 	proc := MockProcess{}
 
-	// Run the process (blocking)
-	proc.Run()
+	// Run the process (non blocking)
+	go proc.Run()
+
+	// Create channel that listen SIGINT (^C) signals.
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGINT)
+	defer close(c)
+
+	for {
+		select {
+		case <-c: // First time it receives a signal calls proc.Stop(). Second time calls os.Exit(1).
+			sigintCallings++
+			if sigintCallings > 1 {
+				fmt.Println("\nNon gracefully shutdown.")
+				os.Exit(1)
+			}
+			go proc.Stop()
+		}
+	}
 }
